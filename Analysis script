@@ -1,0 +1,87 @@
+******************************************************************************
+******************************************************************************
+* 
+* 
+* 
+* Script use for the paper 
+*
+*
+* Katsoulis M, Gomes M, Lai AG, et al. Estimating the Effect of Reduced Attendance at Emergency 
+* Departments for Suspected Cardiac Conditions on Cardiac Mortality During the COVID-19 Pandemic. 
+* Circ Cardiovasc Qual Outcomes. 2021 Jan;14(1):e007085. doi: 10.1161/CIRCOUTCOMES.120.007085. Epub 2020 Dec 20. PMID: 333422
+*
+*
+* Check our youtube video:    https://www.youtube.com/watch?v=sN___9SIB2Q
+*
+******************************************************************************
+******************************************************************************
+*
+*
+*
+* Data dictionary
+
+* t: days from 18th of Dec
+* t2: t squared
+* t3: t cubic
+
+* time: 0--> for the period 18Dec2018 to 15Apr2019
+*       1--> for the period 18Dec2019 to 15Apr2020
+
+* t_int: 0--> Before 12Mar2020
+*        1--> From 12Mar2020 and onwards
+
+
+* cardiac: number of observed attendances to emergency departments for cardiac disease at a specific date
+
+* lag0_card_d: cardiac deaths occured with a lag of 0 days from the date that attendances to emergency departments for cardiac disease were measured
+* lag1_card_d: cardiac deaths occured with a lag of 1 days from the date that attendances to emergency departments for cardiac disease were measured
+* lag2_card_d: cardiac deaths occured with a lag of 2 days from the date that attendances to emergency departments for cardiac disease were measured
+* ...
+* ...
+* ...
+* lag20_card_d: cardiac deaths occured with a lag of 2 days from the date that attendances to emergency departments were measured
+
+
+******************************************************************************
+******************************************************************************
+
+
+
+
+* 60 EDs reported in EDSSS out of the 180 EDs in England
+* we multiply our estimates by 3 to have an estimate in England
+gen cardiac_eng=cardiac*3
+
+******************************************************************************
+
+
+
+reg cardiac_eng  t t2 t3  time t_int
+scalar reduced_EDs=-_b[t_int]*7
+	
+scalar list reduced_EDs
+* we calculate the number of expected reduced attendances per week
+
+forvalues i=0(1)20{
+	ivregress 2sls lag`i'_card_d time t t2 t3 (cardiac_eng = t t2 t3 time t_int), small
+	* Cardiac deaths per 100 non-attendances in EDs
+	scalar b_`i'       = _b[cardiac_eng]  * (-100)
+	scalar se_`i'      = _se[cardiac_eng] * 100
+	scalar low_b_`i'   = b_`i' - invnormal(0.975)*se_`i'
+	scalar high_b_`i'  = b_`i' + invnormal(0.975)*se_`i'
+	* One cardiac death could be prevented for every NNT visits at EDs
+    scalar NNT_`i'     = round(100/b_`i')
+	* Number of cardiac deaths per week
+	scalar b2_`i'      = b_`i' * reduced_EDs/100
+	scalar low_b2_`i'  = low_b_`i' * reduced_EDs/100
+	scalar high_b2_`i' = high_b_`i' * reduced_EDs/100
+	mat define res_`i'f= (b_`i' , low_b_`i' , high_b_`i', NNT_`i' , b2_`i' , low_b2_`i' , high_b2_`i') 
+	mat coln res_`i'f= percent percent_low percent_high NNT card_d card_d_low card_d_high
+	mat rown res_`i'f= lag_`i'
+	mat list res_`i'f
+}
+
+mat define results_final= (res_0f\ res_1f\ res_2f\ res_3f\ res_4f\ res_5f\ res_6f\ res_7f\ res_8f\ res_9f\ res_10f\ res_11f\ res_12f\ res_13f\ res_14f\ res_15f\ res_16f\ res_17f\ res_18f\ res_19f\ res_20f)
+mat list results_final
+* we obtain all the estimates for Figure 1
+
